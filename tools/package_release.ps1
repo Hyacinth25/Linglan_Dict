@@ -9,14 +9,34 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $VersionFile = Join-Path $ProjectRoot "app_version.py"
 $VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
+$PythonCommand = ""
 
-if (Test-Path $VenvPython) {
+function Test-PythonCommand {
+    param(
+        [string]$Command,
+        [switch]$UseLauncher
+    )
+    try {
+        if ($UseLauncher) {
+            & $Command -3 --version | Out-Null
+        }
+        else {
+            & $Command --version | Out-Null
+        }
+        return $LASTEXITCODE -eq 0
+    }
+    catch {
+        return $false
+    }
+}
+
+if ((Test-Path $VenvPython) -and (Test-PythonCommand $VenvPython)) {
     $PythonCommand = $VenvPython
 }
-elseif (Get-Command python -ErrorAction SilentlyContinue) {
+elseif ((Get-Command python -ErrorAction SilentlyContinue) -and (Test-PythonCommand "python")) {
     $PythonCommand = "python"
 }
-elseif (Get-Command py -ErrorAction SilentlyContinue) {
+elseif ((Get-Command py -ErrorAction SilentlyContinue) -and (Test-PythonCommand "py" -UseLauncher)) {
     $PythonCommand = "py"
 }
 else {
