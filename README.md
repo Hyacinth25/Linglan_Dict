@@ -153,6 +153,7 @@ python main.py
 - 配置 API Key / Base URL
 - 编辑故事提示词
 - 调整学习词高亮选项
+- 打开设置页后自动检查 GitHub Releases 是否有新版本
 - 导入/导出账号文件（`.slaccount`）
 
 ## 数据文件说明

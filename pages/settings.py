@@ -134,6 +134,21 @@ def build_settings_page(app):
     app.account_export_button = ttk.Button(account_row, text="导出账号文件", command=app._export_account_data)
     app.account_export_button.pack(side="left", padx=(8, 0))
 
+    update_panel = tk.Frame(app.settings_content, bg=app.card_color, highlightthickness=0, bd=0, padx=20, pady=16)
+    update_panel.pack(fill="x", pady=(0, 12))
+    app.settings_update_tag = RoundedTag(update_panel, text="版本更新", text_font=(app.cn_font_family, 12, "bold"), bg=app.card_color, fg=app.config.theme_color, fill=mix(app.config.theme_color, "#ffffff", 0.88), outline=app.config.theme_color, radius=14, padx=16, pady=7)
+    app.settings_update_tag.pack(anchor="w")
+    update_row = tk.Frame(update_panel, bg=app.card_color)
+    update_row.pack(fill="x", pady=(10, 0))
+    app.update_status_label = tk.Label(update_row, textvariable=app.update_status_var, bg=app.card_color, fg=app.text_secondary, font=(app.cn_font_family, 10), anchor="w")
+    app.update_status_label.pack(side="left", fill="x", expand=True)
+    app.check_update_button = ttk.Button(update_row, text="检查更新", command=app._check_for_updates)
+    app.check_update_button.pack(side="left", padx=(8, 0))
+    app.download_update_button = ttk.Button(update_row, text="下载新版", command=app._open_update_download, state="disabled")
+    app.download_update_button.pack(side="left", padx=(8, 0))
+    app.release_page_button = ttk.Button(update_row, text="发布页", command=app._open_release_page, state="disabled")
+    app.release_page_button.pack(side="left", padx=(8, 0))
+
     highlight_panel = tk.Frame(app.settings_content, bg=app.card_color, highlightthickness=0, bd=0, padx=20, pady=16)
     highlight_panel.pack(fill="x", pady=(0, 12))
     app.settings_highlight_tag = RoundedTag(highlight_panel, text="Learning Word Highlight", text_font=(app.cn_font_family, 12, "bold"), bg=app.card_color, fg=app.config.theme_color, fill=mix(app.config.theme_color, "#ffffff", 0.88), outline=app.config.theme_color, radius=14, padx=16, pady=7)
@@ -220,6 +235,7 @@ def build_settings_page(app):
         app.settings_font_tag,
         app.settings_api_tag,
         app.settings_account_tag,
+        app.settings_update_tag,
         app.settings_highlight_tag,
         app.settings_tips_tag,
         app.settings_prompt_tag,
@@ -229,6 +245,7 @@ def build_settings_page(app):
         font_panel,
         api_panel,
         account_panel,
+        update_panel,
         highlight_panel,
         tips_gallery_panel,
         prompt_panel,

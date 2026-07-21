@@ -7,6 +7,7 @@ import threading
 import tkinter as tk
 import tkinter.font as tkfont
 import re
+import webbrowser
 from datetime import datetime
 from tkinter import colorchooser
 from tkinter import filedialog
@@ -29,7 +30,8 @@ from services.database import DictionaryService as DatabaseService
 from services.account_service import AccountService
 from services.pronunciation_service import PronunciationService
 from services.translation_service import SentenceTranslationService
-from app_version import APP_VERSION
+from services.update_service import UpdateService
+from app_version import APP_VERSION, GITHUB_REPO
 
 
 def _resource_path(relative):
@@ -314,6 +316,7 @@ class VocabularyApp:
         self.translation_service = SentenceTranslationService(from_code="en", to_code="zh")
         self.pronunciation_service = PronunciationService(PRONUNCIATION_CACHE_DIR)
         self.competition_service = CompetitionService(COMPETITION_DATA_PATH)
+        self.update_service = UpdateService(GITHUB_REPO, APP_VERSION)
         self.tips_service = TipsService(
             os.path.join(os.path.dirname(os.path.abspath(__file__)), "tips.txt"),
             os.path.dirname(os.path.abspath(__file__)),
@@ -341,6 +344,7 @@ class VocabularyApp:
         self.study_difficulty_var = tk.StringVar(value=self.config.study_difficulty)
         self.highlight_learning_words_var = tk.BooleanVar(value=self.config.highlight_learning_words)
         self.learning_highlight_color_var = tk.StringVar(value=self.config.learning_highlight_color)
+        self.update_status_var = tk.StringVar(value="当前版本：v%s" % APP_VERSION)
         self.search_word_var = tk.StringVar(value="")
         self.lookup_word_var = tk.StringVar(value="")
         self.lookup_stats_var = tk.StringVar(value=self._format_lookup_stats())
@@ -407,6 +411,9 @@ class VocabularyApp:
         self.startup_loading_tick = 0
         self.startup_loading_base_message = ""
         self.translation_preload_error = ""
+        self.update_check_running = False
+        self.update_auto_checked = False
+        self.latest_release_info = {}
         self.loading_tips = self._load_loading_tips()
         self.last_loading_tip = ""
         self.last_home_tip = ""
@@ -1371,7 +1378,12 @@ class VocabularyApp:
                 panel.configure(bg=self.card_color)
         if hasattr(self, "settings_status_label"):
             self.settings_status_label.configure(bg=self.bg_color, fg=self.text_secondary)
-        for widget_name in ("settings_cn_font_label", "settings_en_font_label", "settings_size_label"):
+        for widget_name in (
+            "settings_cn_font_label",
+            "settings_en_font_label",
+            "settings_size_label",
+            "update_status_label",
+        ):
             if hasattr(self, widget_name):
                 getattr(self, widget_name).configure(bg=self.card_color, fg=self.text_secondary)
         if hasattr(self, "settings_page_tags"):
@@ -1581,6 +1593,8 @@ class VocabularyApp:
             self.add_status_label.configure(font=(self.cn_font_family, base_size))
         if hasattr(self, "settings_status_label"):
             self.settings_status_label.configure(font=(self.cn_font_family, base_size))
+        if hasattr(self, "update_status_label"):
+            self.update_status_label.configure(font=(self.cn_font_family, base_size))
         if hasattr(self, "transition_label"):
             self.transition_label.configure(font=(self.cn_font_family, base_size + 3, "bold"))
         if hasattr(self, "transition_tip_label"):
@@ -1679,6 +1693,8 @@ class VocabularyApp:
             self.settings_account_tag.set_font((self.cn_font_family, 12, "bold"))
         if hasattr(self, "settings_prompt_tag"):
             self.settings_prompt_tag.set_font((self.cn_font_family, 12, "bold"))
+        if hasattr(self, "settings_update_tag"):
+            self.settings_update_tag.set_font((self.cn_font_family, 12, "bold"))
         if hasattr(self, "settings_highlight_tag"):
             self.settings_highlight_tag.set_font((self.cn_font_family, 12, "bold"))
         if hasattr(self, "study_title"):
@@ -1766,6 +1782,81 @@ class VocabularyApp:
             self.settings_status_var.set("已从 .env 重新加载 API_KEY 和 BASE_URL")
         else:
             self.settings_status_var.set("已从 .env 读取 API_KEY 和 BASE_URL")
+
+    def _check_for_updates(self):
+        if self.update_check_running:
+            return
+        if not self.update_service.github_repo:
+            self.update_status_var.set("尚未配置 GitHub 仓库地址")
+            return
+        self.update_check_running = True
+        self.latest_release_info = {}
+        self.update_status_var.set("正在检查 GitHub 最新版本...")
+        if hasattr(self, "check_update_button"):
+            self.check_update_button.configure(state="disabled")
+        if hasattr(self, "download_update_button"):
+            self.download_update_button.configure(state="disabled")
+        if hasattr(self, "release_page_button"):
+            self.release_page_button.configure(state="disabled")
+
+        worker = threading.Thread(target=self._check_for_updates_worker, daemon=True)
+        worker.start()
+
+    def _check_for_updates_worker(self):
+        try:
+            release_info = self.update_service.fetch_latest_release()
+            self.root.after(0, lambda info=release_info: self._on_update_check_success(info))
+        except Exception as exc:
+            message = str(exc) or "检查更新失败"
+            self.root.after(0, lambda msg=message: self._on_update_check_failed(msg))
+
+    def _on_update_check_success(self, release_info):
+        self.update_check_running = False
+        self.latest_release_info = release_info or {}
+        latest_tag = self.latest_release_info.get("tag_name") or (
+            "v%s" % (self.latest_release_info.get("version") or "")
+        )
+        if self.latest_release_info.get("has_update"):
+            self.update_status_var.set(f"发现新版本：{latest_tag}，当前版本：v{APP_VERSION}")
+            if hasattr(self, "download_update_button"):
+                self.download_update_button.configure(
+                    state="normal" if self.latest_release_info.get("asset_url") else "disabled"
+                )
+            if hasattr(self, "release_page_button"):
+                self.release_page_button.configure(state="normal")
+            if hasattr(self, "settings_status_var"):
+                self.settings_status_var.set("发现新版本，可以下载新版或打开发布页查看说明")
+        else:
+            self.update_status_var.set(f"当前已是最新版本：v{APP_VERSION}")
+            if hasattr(self, "release_page_button"):
+                self.release_page_button.configure(state="normal")
+            if hasattr(self, "settings_status_var"):
+                self.settings_status_var.set("当前已是最新版本")
+        if hasattr(self, "check_update_button"):
+            self.check_update_button.configure(state="normal")
+
+    def _on_update_check_failed(self, message):
+        self.update_check_running = False
+        self.update_status_var.set(f"检查更新失败：{message}")
+        if hasattr(self, "check_update_button"):
+            self.check_update_button.configure(state="normal")
+        if hasattr(self, "settings_status_var"):
+            self.settings_status_var.set("检查更新失败，请确认网络连接后重试")
+
+    def _open_update_download(self):
+        url = (self.latest_release_info or {}).get("asset_url") or ""
+        if not url:
+            self._open_release_page()
+            return
+        webbrowser.open(url)
+
+    def _open_release_page(self):
+        url = (self.latest_release_info or {}).get("release_url") or self.update_service.latest_release_url()
+        if not url:
+            if hasattr(self, "settings_status_var"):
+                self.settings_status_var.set("尚未配置 GitHub 仓库地址")
+            return
+        webbrowser.open(url)
 
     def _current_settings_payload(self):
         return {
@@ -2324,6 +2415,9 @@ class VocabularyApp:
             "env_reload_button",
             "account_import_button",
             "account_export_button",
+            "check_update_button",
+            "download_update_button",
+            "release_page_button",
             "study_back_button",
             "study_count_spinbox",
             "study_generate_button",
@@ -2417,6 +2511,9 @@ class VocabularyApp:
             self.settings_scroll_canvas.update_idletasks()
             self.settings_scroll_canvas.configure(scrollregion=self.settings_scroll_canvas.bbox("all"))
             self.settings_scroll_canvas.yview_moveto(0)
+        if not self.update_auto_checked:
+            self.update_auto_checked = True
+            self.root.after(400, self._check_for_updates)
 
     def _show_lookup_page(self):
         self.container.pack_forget()
