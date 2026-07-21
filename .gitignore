@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.python-version
+.pytest_cache/
+*.tmp
+*.lock
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local secrets
+.env
+.env.*
+
+# Build outputs
+build/
+dist/
+release/
+*.spec.bak
+*.exe
+*.zip
+*.7z
+*.rar
+
+# User/local runtime data
+study_stories/
+pronunciation_cache/
+offline_runtime/
+*.slaccount
+lookup_stats.json
+competition_records.json
+seen_tips.json
+ui_config.json
+tmp*.txt
+正在背单词表.txt
+coding_plan.md
+
+# Large dictionary/database files should be shipped as release assets.
+*.db
+*.sqlite
+*.sqlite3
+*.csv
+
+# Local assistant/editor state
+.agents/
+.codex/
+.claude/
+.vscode/
+.idea/

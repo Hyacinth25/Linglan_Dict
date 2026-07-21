@@ -1,0 +1,4 @@
+python-dotenv>=1.0
+argostranslate>=1.9
+openpyxl>=3.1
+pyinstaller>=6.0
